@@ -1,0 +1,21 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#252D3B"/>
+      <stop offset="1" stop-color="#151B26"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F5D06F"/>
+      <stop offset="1" stop-color="#F1B74C"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" rx="48" fill="url(#bg)"/>
+  <rect x="120" y="140" width="420" height="350" rx="36" fill="#1D2431" opacity="0.65"/>
+  <rect x="660" y="110" width="360" height="410" rx="40" fill="#1D2431" opacity="0.4"/>
+  <path d="M208 206h162c38 0 68 30 68 68s-30 68-68 68H208v-36h160c18 0 32-14 32-32s-14-32-32-32H208v-36Z" fill="url(#accent)"/>
+  <text x="200" y="320" font-family="'Playfair Display', 'Times New Roman', serif" font-size="72" font-weight="600" fill="#F7F0E5">Sedulur Personal Blog</text>
+  <text x="200" y="390" font-family="'Work Sans', 'Segoe UI', sans-serif" font-size="28" fill="#C5CFD9">Marketing • Strategy • Humanity</text>
+  <text x="200" y="444" font-family="'Work Sans', 'Segoe UI', sans-serif" font-size="20" fill="#94A3B8">Catatan eksklusif tentang transformasi brand dan perjalanan kreatif.</text>
+  <rect x="200" y="470" width="260" height="58" rx="29" fill="url(#accent)"/>
+  <text x="230" y="508" font-family="'Work Sans', 'Segoe UI', sans-serif" font-size="22" font-weight="600" fill="#1B2431">sedulur.blog</text>
+</svg>

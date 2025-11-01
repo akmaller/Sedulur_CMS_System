@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserTheme {
+  LIGHT
+  DARK
+}
+
+model User {
+  id                     String                 @id @default(cuid())
+  email                  String                 @unique
+  passwordHash           String?
+  name                   String
+  avatarUrl              String?
+  role                   UserRole               @default(AUTHOR)
+  bio                    String?
+  emailVerified          DateTime?
+  canPublish             Boolean                @default(true)
+  twoFactorEnabled       Boolean                @default(false)
+  twoFactorSecret        String?
+  lastLoginAt            DateTime?
+  theme                  UserTheme              @default(LIGHT)
+  socialLinks            Json                   @default("{}")
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  accounts               Account[]
+  articles               Article[]              @relation("ArticleAuthor")
+  auditLogs              AuditLog[]
+  media                  Media[]
+  albums                 Album[]
+  comments               Comment[]
+  pages                  Page[]                 @relation("PageAuthor")
+  sessions               Session[]
+  twoFactorConfirmations TwoFactorConfirmation?
+  twoFactorTokens        TwoFactorToken[]
+  passwordResetTokens    PasswordResetToken[]
+  forbiddenTerms         ForbiddenTerm[]
+  articleLikes           ArticleLike[]
+  commentLikes           CommentLike[]
+  notificationsReceived  Notification[]        @relation("UserNotifications")
+  notificationsSent      Notification[]        @relation("UserNotificationActors")
+
+  @@index([role])
+}
+
+model Category {
+  id          String            @id @default(cuid())
+  name        String
+  slug        String            @unique
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  articles    ArticleCategory[]
+}
+
+model Tag {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  articles  ArticleTag[]
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  title       String
+  fileName    String
+  url         String    @unique
+  mimeType    String
+  size        Int
+  width       Int?
+  height      Int?
+  storageType String    @default("local")
+  createdAt   DateTime  @default(now())
+  createdById String?
+  description String?
+  article     Article[]
+  albumImages AlbumImage[]
+  createdBy   User?     @relation(fields: [createdById], references: [id])
+  pages       Page[]    @relation("PageFeaturedMedia")
+  heroSlides  HeroSlide[]
+
+  @@index([storageType])
+}
+
+model Article {
+  id              String            @id @default(cuid())
+  title           String
+  slug            String            @unique
+  excerpt         String?
+  content         Json
+  status          ArticleStatus     @default(DRAFT)
+  publishedAt     DateTime?
+  featured        Boolean           @default(false)
+  authorId        String
+  featuredMediaId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  author          User              @relation("ArticleAuthor", fields: [authorId], references: [id])
+  featuredMedia   Media?            @relation(fields: [featuredMediaId], references: [id])
+  categories      ArticleCategory[]
+  tags            ArticleTag[]
+  comments        Comment[]
+  likes           ArticleLike[]
+  notifications   Notification[]
+
+  @@index([status, publishedAt])
+  @@index([authorId])
+}
+
+model ArticleCategory {
+  articleId  String
+  categoryId String
+  assignedAt DateTime @default(now())
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, categoryId])
+}
+
+model ArticleTag {
+  articleId  String
+  tagId      String
+  assignedAt DateTime @default(now())
+  article    Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, tagId])
+}
+
+model Comment {
+  id         String         @id @default(cuid())
+  articleId  String
+  userId     String
+  content    String
+  status     CommentStatus  @default(PUBLISHED)
+  ipAddress  String?
+  userAgent  String?
+  parentId   String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  article    Article        @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id])
+  parent     Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[]      @relation("CommentReplies")
+  likes      CommentLike[]
+  notifications Notification[]
+
+  @@index([articleId, status, createdAt])
+  @@index([userId, createdAt])
+  @@index([parentId])
+}
+
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  actorId   String
+  type      NotificationType
+  articleId String?
+  commentId String?
+  createdAt DateTime          @default(now())
+  readAt    DateTime?
+
+  user    User     @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+  actor   User     @relation("UserNotificationActors", fields: [actorId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([actorId])
+  @@index([articleId])
+  @@index([commentId])
+  @@index([readAt])
+}
+
+model ArticleLike {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([articleId, userId])
+  @@index([userId, createdAt])
+}
+
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([commentId, userId])
+  @@index([userId, createdAt])
+}
+
+model Album {
+  id           String        @id @default(cuid())
+  title        String
+  description  String?
+  status       ArticleStatus @default(DRAFT)
+  publishedAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdById  String
+  createdBy    User          @relation(fields: [createdById], references: [id])
+  images       AlbumImage[]
+
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+model AlbumImage {
+  id        String   @id @default(cuid())
+  albumId   String
+  mediaId   String
+  position  Int      @default(0)
+  caption   String?
+  createdAt DateTime @default(now())
+  album     Album    @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media     Media    @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, mediaId])
+  @@index([albumId])
+  @@index([mediaId])
+}
+
+model Page {
+  id              String        @id @default(cuid())
+  title           String
+  slug            String        @unique
+  excerpt         String?
+  content         Json
+  status          ArticleStatus @default(DRAFT)
+  publishedAt     DateTime?
+  authorId        String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  featuredMediaId String?
+  menuItems       MenuItem[]
+  author          User          @relation("PageAuthor", fields: [authorId], references: [id])
+  featuredMedia   Media?        @relation("PageFeaturedMedia", fields: [featuredMediaId], references: [id])
+}
+
+model SiteConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ForbiddenTerm {
+  id                String   @id @default(cuid())
+  phrase            String
+  normalizedPhrase  String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdById       String?
+  createdBy         User?    @relation(fields: [createdById], references: [id])
+
+  @@unique([normalizedPhrase])
+  @@index([createdAt])
+}
+
+model MenuItem {
+  id         String     @id @default(cuid())
+  menu       String
+  title      String
+  slug       String?
+  url        String?
+  icon       String?
+  order      Int        @default(0)
+  parentId   String?
+  pageId     String?
+  isExternal Boolean    @default(false)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  page       Page?      @relation(fields: [pageId], references: [id])
+  parent     MenuItem?  @relation("MenuHierarchy", fields: [parentId], references: [id])
+  children   MenuItem[] @relation("MenuHierarchy")
+
+  @@index([menu])
+  @@index([parentId])
+}
+
+model VisitLog {
+  id         String   @id @default(cuid())
+  path       String
+  url        String?
+  referrer   String?
+  ip         String?
+  userAgent  String?
+  browser    String?
+  os         String?
+  deviceType String
+  createdAt  DateTime @default(now())
+
+  @@index([path, createdAt])
+  @@index([createdAt])
+}
+
+model BlockedIp {
+  id           String   @id @default(cuid())
+  ip           String   @unique
+  reason       String?
+  category     String?
+  blockedUntil DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model RateLimitRecord {
+  id          String   @id @default(cuid())
+  type        String
+  identifier  String
+  windowStart DateTime
+  count       Int      @default(0)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([type, identifier, windowStart])
+}
+
+model SecurityPolicy {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SecurityIncident {
+  id          String   @id @default(cuid())
+  category    String
+  ip          String?
+  source      String?
+  description String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([category, createdAt])
+  @@index([ip])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String
+  userId    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model TwoFactorToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  purpose   TwoFactorTokenPurpose @default(SETUP)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([token])
+}
+
+model TwoFactorConfirmation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model HeroSlide {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  description String?
+  buttonLabel String?
+  buttonUrl   String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  imageId     String?
+  imageUrl    String?
+  image       Media?   @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive, order])
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  AUTHOR
+}
+
+enum TwoFactorTokenPurpose {
+  SETUP
+  LOGIN
+}
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum CommentStatus {
+  PUBLISHED
+  PENDING
+  ARCHIVED
+}
+
+enum NotificationType {
+  ARTICLE_COMMENT
+  COMMENT_REPLY
+  ARTICLE_LIKE
+  COMMENT_LIKE
+}

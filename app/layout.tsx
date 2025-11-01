@@ -1,0 +1,85 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+import { Playfair_Display, Work_Sans } from "next/font/google";
+import "./globals.css";
+
+import { GoogleTagManager } from "@/components/analytics/google-tag-manager";
+import { createMetadata } from "@/lib/seo/metadata";
+import { getSiteConfig } from "@/lib/site-config/server";
+import { cn } from "@/lib/utils";
+
+const workSans = Work_Sans({
+  variable: "--font-body",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const playfairDisplay = Playfair_Display({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await getSiteConfig();
+  const baseMetadata = await createMetadata({
+    config,
+    title: config.metadata.title ?? config.name,
+    description: config.metadata.description ?? config.description,
+    path: "/",
+  });
+
+  const defaultTitle = typeof baseMetadata.title === "string" ? baseMetadata.title : config.name;
+  const iconUrl = config.iconUrl?.trim();
+  const defaultIconHref = iconUrl || "/default-favicon.ico";
+  const appleIconHref =
+    iconUrl && iconUrl.toLowerCase().endsWith(".png") ? iconUrl : "/apple-touch-icon.png";
+
+  return {
+    ...baseMetadata,
+    metadataBase: new URL(config.url),
+    title: {
+      default: defaultTitle,
+      template: `%s | ${config.name}`,
+    },
+    icons: {
+      icon: defaultIconHref,
+      shortcut: defaultIconHref,
+      apple: appleIconHref,
+    },
+  };
+}
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const config = await getSiteConfig();
+  const rawTagId = config.analytics?.googleTagManagerId?.trim() ?? null;
+  const googleTagManagerId = rawTagId && rawTagId.length > 0 ? rawTagId : null;
+  const normalizedTag = googleTagManagerId?.toUpperCase() ?? null;
+  const useNoscript = normalizedTag?.startsWith("GTM-") ?? false;
+  const enableAnalytics =
+    process.env.NODE_ENV === "production" && googleTagManagerId !== null;
+  const resolvedContainerId = enableAnalytics ? googleTagManagerId : null;
+
+  return (
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        {resolvedContainerId ? (
+          <GoogleTagManager containerId={resolvedContainerId} placement="head" />
+        ) : null}
+      </head>
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans text-foreground antialiased",
+          workSans.variable,
+          playfairDisplay.variable
+        )}
+      >
+        {resolvedContainerId && useNoscript ? (
+          <GoogleTagManager containerId={resolvedContainerId} placement="body" />
+        ) : null}
+        {children}
+      </body>
+    </html>
+  );
+}
