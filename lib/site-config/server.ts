@@ -17,6 +17,15 @@ const mergeConfig = (values?: ConfigValues | null): ResolvedSiteConfig => {
   const metadata = values?.metadata ?? {};
   const social = values?.social ?? {};
 
+  const resolveSocialLink = (key: keyof typeof defaultSiteConfig.links): string | null => {
+    const hasCustomValue = social && Object.prototype.hasOwnProperty.call(social, key);
+    if (hasCustomValue) {
+      const raw = (social as Record<string, unknown>)[key];
+      return trimOrNull(raw);
+    }
+    return trimOrNull(defaultSiteConfig.links[key]);
+  };
+
   const registrationDefaults = defaultSiteConfig.registration ?? { enabled: true, autoApprove: false };
   const registrationSetting = values?.registration ?? {};
   const analyticsDefaults = defaultSiteConfig.analytics ?? {};
@@ -49,10 +58,10 @@ const mergeConfig = (values?: ConfigValues | null): ResolvedSiteConfig => {
     iconUrl: resolvedIconUrl,
     contactEmail: resolvedContactEmail,
     links: {
-      facebook: trimOrNull(social.facebook) ?? defaultSiteConfig.links.facebook,
-      instagram: trimOrNull(social.instagram) ?? defaultSiteConfig.links.instagram,
-      twitter: trimOrNull(social.twitter) ?? defaultSiteConfig.links.twitter,
-      youtube: trimOrNull(social.youtube) ?? defaultSiteConfig.links.youtube,
+      facebook: resolveSocialLink("facebook"),
+      instagram: resolveSocialLink("instagram"),
+      twitter: resolveSocialLink("twitter"),
+      youtube: resolveSocialLink("youtube"),
     },
     metadata: {
       title: metadata.title?.trim() || defaultSiteConfig.metadata?.title || defaultSiteConfig.name,

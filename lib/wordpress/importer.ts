@@ -252,18 +252,101 @@ async function fetchJson(url: URL): Promise<Response> {
   return response;
 }
 
+function buildWordpressApiUrls(
+  normalizedSiteUrl: string,
+  resourcePath: string,
+  params: Record<string, string>
+): URL[] {
+  const sanitizedResource = resourcePath.replace(/^\/+/, "");
+  const unique = new Map<string, URL>();
+
+  const appendParams = (target: URL) => {
+    for (const [key, value] of Object.entries(params)) {
+      target.searchParams.set(key, value);
+    }
+  };
+
+  try {
+    const direct = new URL(`${normalizedSiteUrl}/wp-json/wp/v2/${sanitizedResource}`);
+    appendParams(direct);
+    unique.set(direct.toString(), direct);
+  } catch {
+    // ignore malformed direct URL
+  }
+
+  try {
+    const parsed = new URL(normalizedSiteUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname !== "public-api.wordpress.com") {
+      const trimmedPath = parsed.pathname.replace(/\/+$/, "");
+      const sitePath = trimmedPath.replace(/^\/+/, "");
+      const siteIdentifier = sitePath ? `${parsed.host}/${sitePath}` : parsed.host;
+      if (siteIdentifier) {
+        const publicApi = new URL(`https://public-api.wordpress.com/wp/v2/sites/${siteIdentifier}/${sanitizedResource}`);
+        appendParams(publicApi);
+        unique.set(publicApi.toString(), publicApi);
+      }
+    } else {
+      const path = parsed.pathname.replace(/^\/+/, "").replace(/\/+$/, "");
+      const prefix = "wp/v2/sites/";
+      if (path.startsWith(prefix)) {
+        const siteIdentifier = path.slice(prefix.length);
+        if (siteIdentifier) {
+          const publicApi = new URL(`https://public-api.wordpress.com/wp/v2/sites/${siteIdentifier}/${sanitizedResource}`);
+          appendParams(publicApi);
+          unique.set(publicApi.toString(), publicApi);
+        }
+      }
+    }
+  } catch {
+    // ignore malformed fallback URL
+  }
+
+  return Array.from(unique.values());
+}
+
+async function fetchWordpressJson(
+  normalizedSiteUrl: string,
+  resourcePath: string,
+  params: Record<string, string>
+): Promise<Response> {
+  const candidates = buildWordpressApiUrls(normalizedSiteUrl, resourcePath, params);
+  if (candidates.length === 0) {
+    throw new Error("Gagal mengambil data WordPress. URL situs tidak valid.");
+  }
+
+  let lastError: Error | null = null;
+  for (const candidate of candidates) {
+    try {
+      return await fetchJson(candidate);
+    } catch (error) {
+      if (error instanceof Error) {
+        lastError = error;
+      } else {
+        lastError = new Error("Gagal mengambil data WordPress.");
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error("Gagal mengambil data WordPress.");
+}
+
 export async function getWordpressCategories(siteUrl: string): Promise<WordpressCategory[]> {
   const normalizedUrl = normalizeSiteUrl(siteUrl);
-  const base = new URL(`${normalizedUrl}/wp-json/wp/v2/categories`);
-  base.searchParams.set("per_page", "100");
-  base.searchParams.set("orderby", "name");
-  base.searchParams.set("order", "asc");
 
   const categories: WordpressCategory[] = [];
   let page = 1;
   while (true) {
-    base.searchParams.set("page", String(page));
-    const response = await fetchJson(base);
+    const response = await fetchWordpressJson(normalizedUrl, "categories", {
+      per_page: "100",
+      orderby: "name",
+      order: "asc",
+      page: String(page),
+    });
     const payload = (await response.json()) as Array<{
       id?: number;
       name?: string;
@@ -350,15 +433,15 @@ export async function getWordpressPostsForCategory(
   page: number
 ): Promise<WordpressPostsResponse> {
   const normalizedUrl = normalizeSiteUrl(siteUrl);
-  const endpoint = new URL(`${normalizedUrl}/wp-json/wp/v2/posts`);
-  endpoint.searchParams.set("categories", String(categoryId));
-  endpoint.searchParams.set("per_page", String(POSTS_PER_PAGE));
-  endpoint.searchParams.set("page", String(page));
-  endpoint.searchParams.set("orderby", "date");
-  endpoint.searchParams.set("order", "desc");
-  endpoint.searchParams.set("_embed", "1");
 
-  const response = await fetchJson(endpoint);
+  const response = await fetchWordpressJson(normalizedUrl, "posts", {
+    categories: String(categoryId),
+    per_page: String(POSTS_PER_PAGE),
+    page: String(page),
+    orderby: "date",
+    order: "desc",
+    _embed: "1",
+  });
   const payload = (await response.json()) as WordpressPostApiPayload[];
   const posts = payload
     .map(transformWordpressPost)

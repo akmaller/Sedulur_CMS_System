@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, RotateCcw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,16 @@ export function AlbumForm({ initialValues, submitLabel = "Simpan Album" }: Album
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [existingImages, setExistingImages] = useState<
+    Array<{ id: string; url: string; caption: string; isRemoved: boolean }>
+  >(() =>
+    (initialValues?.images ?? []).map((image) => ({
+      id: image.id,
+      url: image.url,
+      caption: image.caption ?? "",
+      isRemoved: false,
+    }))
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +95,16 @@ export function AlbumForm({ initialValues, submitLabel = "Simpan Album" }: Album
             return typeof description === "string" ? description : "";
           });
           formData.set("fileDescriptions", JSON.stringify(descriptions));
+          const activeImages = existingImages.filter((image) => !image.isRemoved);
+          const removedImages = existingImages.filter((image) => image.isRemoved);
+          const captionsMap = activeImages.reduce<Record<string, string>>((acc, image) => {
+            acc[image.id] = image.caption.trim();
+            return acc;
+          }, {});
+
+          formData.set("imageOrder", JSON.stringify(activeImages.map((image) => image.id)));
+          formData.set("removedImageIds", JSON.stringify(removedImages.map((image) => image.id)));
+          formData.set("imageCaptions", JSON.stringify(captionsMap));
 
           startTransition(async () => {
             setError(null);
@@ -129,6 +150,133 @@ export function AlbumForm({ initialValues, submitLabel = "Simpan Album" }: Album
               placeholder="Ceritakan isi album atau informasi penting lainnya"
             />
           </div>
+
+          {existingImages.length > 0 ? (
+            <div className="space-y-3">
+              <Label>Gambar album saat ini</Label>
+              <div className="space-y-3">
+                {existingImages.map((image, index) => {
+                  const isRemoved = image.isRemoved;
+                  return (
+                    <div
+                      key={image.id}
+                      className="flex flex-col gap-3 rounded-lg border border-border/60 bg-card/60 p-4 md:flex-row md:items-center"
+                    >
+                      <div className="flex w-full items-start gap-3 md:w-1/3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={image.url}
+                          alt={`Gambar album ${index + 1}`}
+                          className="h-28 w-28 rounded-md object-cover shadow-sm"
+                        />
+                        <div className="flex flex-col gap-2">
+                          <div className="inline-flex items-center rounded bg-muted px-2 py-1 text-xs font-semibold uppercase text-muted-foreground">
+                            #{index + 1}
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExistingImages((prev) => {
+                                  if (index === 0) return prev;
+                                  const next = [...prev];
+                                  const temp = next[index - 1];
+                                  next[index - 1] = next[index];
+                                  next[index] = temp;
+                                  return next;
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 transition hover:border-primary hover:text-primary"
+                              disabled={index === 0}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                              <span>Naik</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExistingImages((prev) => {
+                                  if (index === prev.length - 1) return prev;
+                                  const next = [...prev];
+                                  const temp = next[index + 1];
+                                  next[index + 1] = next[index];
+                                  next[index] = temp;
+                                  return next;
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 transition hover:border-primary hover:text-primary"
+                              disabled={index === existingImages.length - 1}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                              <span>Turun</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-1 flex-col gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor={`caption-${image.id}`}>Deskripsi gambar</Label>
+                          <Input
+                            id={`caption-${image.id}`}
+                            value={image.caption}
+                            placeholder="Tambahkan deskripsi singkat"
+                            disabled={isRemoved}
+                            onChange={(event) =>
+                              setExistingImages((prev) =>
+                                prev.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, caption: event.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {!isRemoved ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExistingImages((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, isRemoved: true } : item
+                                  )
+                                )
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-destructive/40 px-3 py-1.5 text-sm text-destructive transition hover:border-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span>Hapus</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExistingImages((prev) =>
+                                  prev.map((item, itemIndex) =>
+                                    itemIndex === index ? { ...item, isRemoved: false } : item
+                                  )
+                                )
+                              }
+                              className="inline-flex items-center gap-1 rounded-full border border-primary px-3 py-1.5 text-sm text-primary transition hover:bg-primary/10"
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                              <span>Batalkan Hapus</span>
+                            </button>
+                          )}
+                          {isRemoved ? (
+                            <span className="rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-destructive">
+                              Akan dihapus
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <select

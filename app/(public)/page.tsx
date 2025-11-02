@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArticleStatus, Prisma } from "@prisma/client";
@@ -11,9 +10,10 @@ import { logPageView } from "@/lib/visits/log-page-view";
 import { buttonVariants } from "@/lib/button-variants";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/datetime/relative";
-import { Card, CardContent } from "@/components/ui/card";
+import { serializePublicArticle, publicArticleInclude } from "@/lib/articles/public";
 
 import { HeroSlider, type HeroSlideItem } from "./(components)/hero-slider";
+import { LatestArticlesGrid } from "./(components)/latest-articles-grid";
 
 type HeroSlideWithImage = Prisma.HeroSlideGetPayload<{
   include: {
@@ -27,17 +27,6 @@ type HeroSlideWithImage = Prisma.HeroSlideGetPayload<{
     };
   };
 }>;
-
-const FEATURED_PARTNERS = [
-  "Blizzard",
-  "Sprint",
-  "Tesla",
-  "CNN",
-  "CBS",
-  "Rolex",
-  "Coca-Cola",
-  "Time Inc.",
-];
 
 export async function generateMetadata(): Promise<Metadata> {
   const config = await getSiteConfig();
@@ -96,7 +85,7 @@ function getPrimaryCategory(article: {
 }
 
 export default async function HomePage() {
-  const [siteConfig, heroSlidesRaw, latestArticles] = await Promise.all([
+  const [siteConfig, heroSlidesRaw, latestArticles, featuredArticle, totalPublishedArticles] = await Promise.all([
     getSiteConfig(),
     prisma.heroSlide.findMany({
       where: { isActive: true },
@@ -115,7 +104,21 @@ export default async function HomePage() {
     prisma.article.findMany({
       where: { status: ArticleStatus.PUBLISHED },
       orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-      take: 6,
+      take: 12,
+      include: publicArticleInclude,
+    }),
+    prisma.article.findFirst({
+      where: {
+        status: ArticleStatus.PUBLISHED,
+        categories: {
+          some: {
+            category: {
+              slug: "featured",
+            },
+          },
+        },
+      },
+      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
       include: {
         featuredMedia: {
           select: {
@@ -131,6 +134,7 @@ export default async function HomePage() {
         },
       },
     }),
+    prisma.article.count({ where: { status: ArticleStatus.PUBLISHED } }),
   ]);
 
   const fallbackHero: HeroSlideItem = {
@@ -144,8 +148,14 @@ export default async function HomePage() {
   };
 
   const heroSlides = resolveHeroSlides(heroSlidesRaw, fallbackHero);
-  const firstName = siteConfig.name.split(" ")[0] ?? siteConfig.name;
-  const latestPostCards = latestArticles.slice(0, 3);
+  const latestPosts = latestArticles.slice(0, 3);
+  const featuredPost = featuredArticle ?? null;
+  const pageSize = 9;
+  const baseIndex = 2;
+  const gridSource = latestArticles.slice(baseIndex);
+  const initialGridArticles = gridSource.slice(0, pageSize).map(serializePublicArticle);
+  const hasBaseArticles = totalPublishedArticles > baseIndex;
+  const initialHasMore = totalPublishedArticles > baseIndex + initialGridArticles.length;
 
   const headerList = await headers();
   const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
@@ -164,166 +174,134 @@ export default async function HomePage() {
   });
 
   return (
-    <div className="flex flex-col gap-20 pb-24 pt-8">
-      <section className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <HeroSlider
-          slides={heroSlides}
-          siteName={siteConfig.name}
-          tagline={siteConfig.tagline ?? null}
-        />
-      </section>
+    <div className="relative">
+      <HeroSlider
+        slides={heroSlides}
+        siteName={siteConfig.name}
+        tagline={siteConfig.tagline ?? null}
+      />
 
-      <section className="mx-auto w-full max-w-5xl px-4 text-center sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-xs font-medium uppercase tracking-[0.4em] text-muted-foreground/80 sm:text-sm">
-          {FEATURED_PARTNERS.map((partner) => (
-            <span key={partner} className="opacity-80">
-              {partner}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto grid w-full max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:gap-12 lg:px-8">
-        <div className="space-y-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
-            Work With {firstName}
-          </p>
-          <h2 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-            {siteConfig.description}
-          </h2>
-          <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-            Saya membantu brand, pebisnis kreatif, dan komunitas untuk tumbuh lewat strategi
-            pemasaran yang manusiawi, storytelling yang relevan, serta pengalaman digital yang
-            konsisten. Kolaborasi dimulai dengan mendengarkan: mari cari tahu bagaimana kita bisa
-            menciptakan dampak.
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/contact"
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "h-12 rounded-full bg-primary px-6 text-base font-semibold text-primary-foreground transition hover:bg-primary/90",
+      <div className="relative z-10 flex flex-col gap-20 pb-24 pt-[100vh]">
+        <section className="mx-auto grid w-full max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:gap-12 lg:px-8">
+          <div className="flex h-full flex-col">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
+              Highlight Unggulan
+            </p>
+            <div className="mt-6 flex-1">
+              {featuredPost ? (
+                <Link
+                  href={`/articles/${featuredPost.slug}`}
+                  className="group flex h-full flex-col overflow-hidden rounded-3xl border border-primary/40 bg-primary/5 p-8 shadow-lg shadow-primary/10 transition hover:-translate-y-1 hover:border-primary/70 hover:shadow-xl hover:shadow-primary/20"
+                >
+                  <div className="flex flex-1 flex-col gap-4">
+                    <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-primary">
+                      <span>
+                        {featuredPost.categories.find((cat) => cat.category.slug === "featured")?.category
+                          .name ?? "Featured"}
+                      </span>
+                      <span>{formatPublishedLabel(featuredPost.publishedAt ?? featuredPost.createdAt)}</span>
+                    </div>
+                    <h3 className="font-display text-2xl text-foreground transition group-hover:text-primary">
+                      {featuredPost.title}
+                    </h3>
+                    {featuredPost.excerpt ? (
+                      <p className="text-base text-muted-foreground">{featuredPost.excerpt}</p>
+                    ) : null}
+                    <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-primary">
+                      Baca sekarang
+                      <span aria-hidden className="transition group-hover:translate-x-1">→</span>
+                    </span>
+                  </div>
+                </Link>
+              ) : (
+                <div className="flex h-full flex-col items-start justify-center rounded-3xl border border-border/50 bg-card/40 p-10 text-left shadow-lg shadow-black/10">
+                  <p className="text-base text-muted-foreground">
+                    Belum ada artikel yang ditandai sebagai unggulan. Tandai salah satu artikel dengan
+                    kategori <span className="font-semibold text-primary">Featured</span> untuk
+                    menampilkannya di sini.
+                  </p>
+                  <Link
+                    href="/dashboard/articles"
+                    className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition hover:text-primary/80"
+                  >
+                    Kelola artikel
+                    <span aria-hidden>→</span>
+                  </Link>
+                </div>
               )}
-            >
-              Jadwalkan Konsultasi
-            </Link>
-            <Link
-              href="/about"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "h-12 rounded-full border-primary/40 bg-transparent px-6 text-base font-semibold text-primary transition hover:border-primary hover:bg-primary/10",
-              )}
-            >
-              Tentang Saya
-            </Link>
+            </div>
           </div>
-        </div>
-
-        <Card className="border border-border/50 bg-card/40 px-6 py-8 shadow-lg shadow-black/10 backdrop-blur">
-          <CardContent className="space-y-6 p-0">
+          <div className="flex h-full flex-col gap-6 rounded-3xl border border-border/50 bg-card/40 px-6 py-8 shadow-lg shadow-black/10 backdrop-blur">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
-                Newsletter Eksklusif
+                Artikel Terbaru
               </p>
-              <h3 className="mt-2 font-display text-2xl text-foreground">
-                Dapatkan insight marketing terbaru setiap minggu.
-              </h3>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Saya mengkurasi eksperimen, strategi, dan template kerja yang bisa langsung Anda
-              terapkan untuk memperkuat suara brand dan komunitas.
-            </p>
-            <form className="space-y-3">
-              <input
-                type="email"
-                name="email"
-                placeholder="Alamat email Anda"
-                className="h-12 w-full rounded-full border border-border/60 bg-background/40 px-5 text-base text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                aria-label="Alamat email Anda"
-              />
-              <button
-                type="submit"
-                className="flex h-12 w-full items-center justify-center rounded-full bg-primary text-base font-semibold text-primary-foreground transition hover:bg-primary/90"
-              >
-                Bergabung Sekarang
-              </button>
-            </form>
-          </CardContent>
-        </Card>
-      </section>
+            <ul className="space-y-4">
+              {latestPosts.length === 0 ? (
+                <li className="text-sm text-muted-foreground">
+                  Belum ada artikel yang diterbitkan. Nantikan insight terbaru di blog ini.
+                </li>
+              ) : (
+                latestPosts.slice(0, 2).map((article) => {
+                  const primaryCategory = getPrimaryCategory(article);
+                  const publishedLabel = formatPublishedLabel(article.publishedAt ?? article.createdAt);
 
-      <section className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
-              Tulisan Terbaru
-            </p>
-            <h2 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
-              Cerita, analisis, dan eksperimen terbaru.
-            </h2>
+                  return (
+                    <li key={article.id}>
+                      <Link
+                        href={`/articles/${article.slug}`}
+                        className="group flex flex-col rounded-2xl border border-border/50 bg-background/30 px-5 py-4 transition hover:border-primary/50 hover:bg-primary/5"
+                      >
+                        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
+                          <span>{primaryCategory?.name ?? "Artikel"}</span>
+                          <span>{publishedLabel}</span>
+                        </div>
+                        <h4 className="mt-2 font-display text-lg text-foreground transition group-hover:text-primary">
+                          {article.title}
+                        </h4>
+                        {article.excerpt ? (
+                          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{article.excerpt}</p>
+                        ) : null}
+                      </Link>
+                    </li>
+                  );
+                })
+              )}
+            </ul>
           </div>
-          <Link
-            href="/articles"
-            className={cn(
-              buttonVariants({ variant: "ghost" }),
-              "inline-flex h-10 items-center rounded-full border border-border/50 px-5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary",
-            )}
-          >
-            Lihat semua artikel
-          </Link>
-        </div>
+        </section>
 
-        <div className="mt-8 grid gap-6 md:grid-cols-3">
-          {latestPostCards.map((article) => {
-            const primaryCategory = getPrimaryCategory(article);
-            const publishedLabel = formatPublishedLabel(article.publishedAt ?? article.createdAt);
-            const imageUrl = article.featuredMedia?.url ?? null;
+        <section className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
+                Tulisan Terbaru
+              </p>
+              <h2 className="font-display text-3xl tracking-tight text-foreground sm:text-4xl">
+                Cerita, analisis, dan tulisan terbaru.
+              </h2>
+            </div>
+            <Link
+              href="/articles"
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "inline-flex h-10 items-center rounded-full border border-border/50 px-5 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary",
+              )}
+            >
+              Lihat semua artikel
+            </Link>
+          </div>
 
-            return (
-              <Link
-                key={article.id}
-                href={`/articles/${article.slug}`}
-                className="group relative flex h-full flex-col overflow-hidden rounded-3xl border border-border/40 bg-card/50 shadow-lg shadow-black/10 transition hover:-translate-y-1 hover:border-primary/60 hover:shadow-xl hover:shadow-primary/10"
-              >
-                <div className="relative overflow-hidden">
-                  <div className="absolute inset-0 rounded-b-[48px] bg-gradient-to-b from-transparent via-background/20 to-background/80 opacity-0 transition duration-500 group-hover:opacity-100" />
-                  {imageUrl ? (
-                    <Image
-                      src={imageUrl}
-                      alt={article.featuredMedia?.title ?? article.title}
-                      width={600}
-                      height={400}
-                      className="h-48 w-full object-cover transition duration-700 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-48 w-full items-center justify-center bg-secondary/40 text-sm font-semibold uppercase tracking-[0.35em] text-muted-foreground">
-                      {primaryCategory?.name ?? "Artikel"}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-4 p-6">
-                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                    <span>{primaryCategory?.name ?? "Artikel"}</span>
-                    <span>{publishedLabel}</span>
-                  </div>
-                  <h3 className="font-display text-xl text-foreground transition group-hover:text-primary">
-                    {article.title}
-                  </h3>
-                  {article.excerpt ? (
-                    <p className="line-clamp-3 text-sm text-muted-foreground">{article.excerpt}</p>
-                  ) : null}
-                  <span className="mt-auto inline-flex items-center gap-2 text-sm font-semibold text-primary">
-                    Baca selengkapnya
-                    <span aria-hidden className="transition group-hover:translate-x-1">
-                      →
-                    </span>
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+          <LatestArticlesGrid
+            initialArticles={initialGridArticles}
+            pageSize={pageSize}
+            baseIndex={baseIndex}
+            hasBaseArticles={hasBaseArticles}
+            initialHasMore={initialHasMore}
+          />
+        </section>
+      </div>
     </div>
   );
 }

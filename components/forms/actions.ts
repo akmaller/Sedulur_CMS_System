@@ -383,6 +383,7 @@ export async function createCategory(formData: FormData) {
     });
 
     revalidateTag("content");
+    revalidatePath("/dashboard/users");
     return { success: true };
   } catch (error) {
     console.error(error);

@@ -381,9 +381,5 @@ export function ArticleViewer({ content, tags }: ArticleViewerProps) {
 
   const tagContext = createTagMatchContext(tags ?? []);
 
-  return (
-    <div className="prose prose-neutral max-w-none dark:prose-invert">
-      {renderNodes(doc.content, "node", tagContext)}
-    </div>
-  );
+  return <div className="prose prose-invert max-w-none">{renderNodes(doc.content, "node", tagContext)}</div>;
 }

@@ -129,18 +129,14 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const publishedAtLabel =
     formatRelativeTime(article.publishedAt ?? article.createdAt) || "-";
 
-  const authorNameDisplay = article.author?.name?.trim() ?? null;
-  const authorAvatarUrl = article.author?.avatarUrl ?? null;
-  const authorInitial = authorNameDisplay?.charAt(0).toUpperCase() ?? "A";
-
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <article className="flex flex-col gap-10">
+        <article className="flex flex-col gap-10 text-white">
           <header className="space-y-4">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{article.title}</h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-white/80">
                 {categories.length ? (
                   <>
                     <div className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.15em]">
@@ -158,7 +154,6 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                   </>
                 ) : null}
                 <span>{publishedAtLabel}</span>
-                <span aria-hidden>•</span>
                 <span
                   className="flex items-center gap-1"
                   title={`${viewCountLabel} kunjungan unik`}
@@ -167,31 +162,6 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                   <Eye className="h-4 w-4" aria-hidden="true" />
                   <span>{viewCountLabel}</span>
                 </span>
-                {article.author ? (
-                  <>
-                    <span aria-hidden>•</span>
-                    <span className="flex items-center gap-2">
-                      <span>oleh</span>
-                      <span className="flex items-center gap-2 font-medium text-primary">
-                        {authorAvatarUrl ? (
-                          <Image
-                            src={authorAvatarUrl}
-                            alt={`Foto ${authorNameDisplay ?? "Penulis"}`}
-                            width={24}
-                            height={24}
-                            className="h-6 w-6 rounded-full object-cover"
-                            sizes="24px"
-                          />
-                        ) : (
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold uppercase text-primary">
-                            {authorInitial}
-                          </span>
-                        )}
-                        <span>{authorNameDisplay ?? article.author.name}</span>
-                      </span>
-                    </span>
-                  </>
-                ) : null}
               </div>
             </div>
           </header>
@@ -236,7 +206,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
               </div>
             ) : null}
 
-            <Card>
+            <Card className="border-white/20 bg-white/5 text-white">
               <CardContent className="py-4">
                 <ShareActions
                   title={article.title}

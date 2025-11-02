@@ -63,7 +63,7 @@ export default async function AlbumDetailPage({ params }: AlbumPageProps) {
   }
 
   return (
-    <article className="space-y-10">
+    <article className="space-y-10 px-4 sm:px-6 lg:px-8">
       <header className="space-y-3">
         <div className="space-y-2">
           <p className="text-sm uppercase tracking-wide text-primary/70">Album Foto</p>

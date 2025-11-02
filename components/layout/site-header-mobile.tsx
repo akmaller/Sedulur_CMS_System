@@ -14,7 +14,6 @@ import { usePathname } from "next/navigation";
 import { Facebook, Instagram, Search, Twitter, Youtube, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
-import { PublicAuthActions } from "@/app/(public)/(components)/auth-actions";
 import type { ResolvedSiteConfig } from "@/lib/site-config/types";
 import { resolveMenuHref, type MenuNode } from "@/lib/menu/utils";
 import { cn } from "@/lib/utils";
@@ -199,7 +198,25 @@ export function MobileNavigation({ siteConfig, mainMenu }: MobileNavigationProps
                 <Search className="h-4 w-4" />
                 <span>Cari Artikel</span>
               </Link>
-              <PublicAuthActions />
+              {socialLinks.length > 0 ? (
+                <div className="flex items-center justify-center gap-3">
+                  {socialLinks.map((entry) => {
+                    const Icon = entry.icon;
+                    return (
+                      <a
+                        key={entry.key}
+                        href={entry.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-primary/60 hover:text-primary"
+                        aria-label={entry.label}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           </div>
           <nav className="flex-1 overflow-y-auto px-4 py-4 text-sm">

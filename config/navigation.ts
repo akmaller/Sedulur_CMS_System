@@ -23,5 +23,6 @@ export const dashboardNavigation: NavItem[] = [
   { name: "Halaman", href: "/dashboard/pages", roles: ["ADMIN", "EDITOR"] },
   { name: "Menu", href: "/dashboard/menus", roles: ["ADMIN", "EDITOR"] },
   { name: "Hero Slider", href: "/dashboard/hero-slider", roles: ["ADMIN", "EDITOR"] },
+  { name: "Pengguna", href: "/dashboard/users", roles: ["ADMIN"] },
   { name: "Konfigurasi", href: "/dashboard/settings/general", roles: ["ADMIN"] },
 ];

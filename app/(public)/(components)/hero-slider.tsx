@@ -1,11 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-import { buttonVariants } from "@/lib/button-variants";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 export type HeroSlideItem = {
@@ -43,7 +39,7 @@ function renderEmphasis(text: string, keyPrefix: string) {
 
 export function HeroSlider({ slides, siteName, tagline }: HeroSliderProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [progressCycle, setProgressCycle] = useState(0);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const safeSlides = useMemo(() => (slides.length === 0 ? [] : slides), [slides]);
   const slideCount = safeSlides.length;
   const activeSlide = safeSlides[activeIndex] ?? null;
@@ -64,168 +60,143 @@ export function HeroSlider({ slides, siteName, tagline }: HeroSliderProps) {
   }, [activeIndex, slideCount]);
 
   useEffect(() => {
-    if (slideCount === 0) {
-      return;
-    }
+    const handleScroll = () => {
+      const viewportHeight = window.innerHeight || 1;
+      const rawProgress = window.scrollY / viewportHeight;
+      const clamped = Math.min(Math.max(rawProgress, 0), 1);
+      setScrollProgress(clamped);
+    };
 
-    const frame = window.requestAnimationFrame(() => {
-      setProgressCycle((value) => value + 1);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [activeIndex, slideCount]);
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   if (!activeSlide) {
     return (
-      <div className="rounded-[32px] border border-border/40 bg-secondary/40 px-6 py-12 text-center sm:px-12">
-        <p className="text-base text-muted-foreground">
-          Tambahkan setidaknya satu slide hero dari dashboard untuk menampilkan highlight utama.
-        </p>
-      </div>
+      <section className="fixed inset-0 z-0 flex h-screen w-full items-center justify-center bg-[radial-gradient(circle_at_top,_hsla(218,_35%,_18%,_0.65),_hsla(218,_28%,_14%,_0.95))] px-4 text-center text-muted-foreground sm:px-8">
+        <div className="max-w-xl">
+          <p className="text-base">
+            Tambahkan setidaknya satu slide hero dari dashboard untuk menampilkan highlight utama.
+          </p>
+        </div>
+      </section>
     );
   }
 
-  const indicatorKey = `${progressCycle}-${activeIndex}`;
   const slideSubtitle = activeSlide.subtitle ?? tagline ?? "Personal Blog";
-  const ctaUrl = activeSlide.buttonUrl ?? "/articles";
-  const ctaLabel = activeSlide.buttonLabel ?? "Jelajahi Blog";
-
-  const handlePrev = () => {
-    setActiveIndex((current) => {
-      if (slideCount === 0) return 0;
-      return current === 0 ? slideCount - 1 : current - 1;
-    });
-  };
-
-  const handleNext = () => {
-    setActiveIndex((current) => {
-      if (slideCount === 0) return 0;
-      return current + 1 >= slideCount ? 0 : current + 1;
-    });
-  };
-
-  const handleSelect = (index: number) => {
-    setActiveIndex(index);
+  const opacity = Math.max(0, 1 - scrollProgress * 1.2);
+  const translateY = scrollProgress * -60;
+  const sliderStyle: CSSProperties = {
+    opacity,
+    transform: `translateY(${translateY}px)`,
+    pointerEvents: scrollProgress > 0.9 ? "none" : "auto",
   };
 
   return (
-    <section className="relative overflow-hidden rounded-[36px] border border-border/40 bg-[radial-gradient(circle_at_top,_hsla(218,_35%,_18%,_0.85),_hsla(218,_28%,_14%,_0.98))] px-6 py-12 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.45)] sm:px-12 sm:py-16 lg:px-16">
-      <div className="flex flex-col gap-12 lg:flex-row lg:items-center">
-        <div className="flex-1 space-y-6">
-          <div className="space-y-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary/90">
-              {slideSubtitle}
-            </span>
-            <h1 className="font-display text-4xl leading-tight text-foreground sm:text-5xl lg:text-6xl">
-              {renderEmphasis(activeSlide.title, "title")}
-            </h1>
-          </div>
-          {activeSlide.description ? (
-            <p className="max-w-2xl text-base text-muted-foreground sm:text-lg">
-              {renderEmphasis(activeSlide.description, "description")}
-            </p>
-          ) : null}
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href={ctaUrl}
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "h-12 rounded-full bg-primary px-6 text-base font-semibold text-primary-foreground transition hover:bg-primary/90",
-              )}
-            >
-              {ctaLabel}
-            </Link>
-            {slideCount > 1 ? (
-              <button
-                type="button"
-                onClick={handleNext}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "lg" }),
-                  "h-12 rounded-full border border-border/60 bg-transparent px-6 text-base font-semibold text-foreground transition hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                )}
-              >
-                Slide Selanjutnya
-              </button>
-            ) : (
-              <Link
-                href="/articles"
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "lg" }),
-                  "h-12 rounded-full border border-border/60 bg-transparent px-6 text-base font-semibold text-foreground transition hover:border-primary hover:bg-primary/10 hover:text-primary",
-                )}
-              >
-                Baca Artikel Terbaru
-              </Link>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="hidden flex-1 items-center gap-2 md:flex">
-              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-border/50">
-                <div
-                  key={indicatorKey}
-                  className="hero-slider-progress-bar absolute inset-0 h-full rounded-full bg-primary/80"
-                  style={{
-                    animationDuration: `${AUTO_INTERVAL_MS}ms`,
-                  }}
-                />
-              </div>
-              <span className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                {activeIndex + 1}/{slideCount}
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrev}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-secondary/50 text-foreground transition hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                aria-label="Slide sebelumnya"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-secondary/50 text-foreground transition hover:border-primary hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                aria-label="Slide selanjutnya"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-          <div className="mt-6 flex items-center gap-2">
-            {safeSlides.map((slide, index) => (
-              <button
-                key={slide.id}
-                type="button"
-                onClick={() => handleSelect(index)}
-                className={cn(
-                  "h-2.5 rounded-full transition-all duration-300",
-                  index === activeIndex ? "w-9 bg-primary" : "w-2.5 bg-border/60 hover:bg-primary/70",
-                )}
-                aria-label={`Pilih slide ${index + 1}`}
-                aria-current={index === activeIndex}
-              />
-            ))}
+    <section
+      className="fixed inset-0 z-0 flex h-screen w-full overflow-hidden bg-[radial-gradient(circle_at_top,_hsla(218,_35%,_18%,_0.85),_hsla(218,_28%,_14%,_0.98))]"
+      style={sliderStyle}
+    >
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background/10 via-transparent to-transparent" aria-hidden />
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-24 pt-16 sm:px-6 md:flex-row md:items-center md:gap-12 md:px-8 md:pt-14 lg:gap-16 lg:px-12 lg:pt-20">
+        <div className="hidden flex-1 md:block">
+          <div className="relative min-h-[280px] space-y-5 md:min-h-[340px]">
+            {safeSlides.map((slide, index) => {
+              const isActive = index === activeIndex;
+              const subtitle = slide.subtitle ?? slideSubtitle;
+              const description = slide.description ?? activeSlide.description;
+              const descriptionContent = description
+                ? renderEmphasis(description, `description-${slide.id}`)
+                : null;
+
+              return (
+                <article
+                  key={slide.id}
+                  className={cn(
+                    "absolute inset-0 flex flex-col gap-6 transition-opacity duration-1000 ease-out",
+                    isActive ? "opacity-100" : "pointer-events-none opacity-0",
+                  )}
+                  aria-hidden={!isActive}
+                >
+                  <div className="space-y-3">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-primary/90 sm:text-xs">
+                      {subtitle}
+                    </span>
+                    <h1 className="font-display text-4xl leading-tight text-foreground sm:text-5xl lg:text-6xl">
+                      {renderEmphasis(slide.title, `title-${slide.id}`)}
+                    </h1>
+                  </div>
+                  {descriptionContent ? (
+                    <p className="max-w-xl text-base text-muted-foreground sm:text-lg">
+                      {descriptionContent}
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center">
-          <div className="relative w-full max-w-md rounded-[32px] border border-border/40 bg-secondary/30 p-6 shadow-[0_25px_60px_-25px_rgba(0,0,0,0.55)]">
-            <div className="absolute inset-0 rounded-[32px] border border-primary/20 opacity-30" aria-hidden />
-            {activeSlide.imageUrl ? (
-              <Image
-                key={`${activeSlide.id}-${activeIndex}`}
-                src={activeSlide.imageUrl}
-                alt={activeSlide.title || siteName}
-                width={600}
-                height={800}
-                className="relative z-[1] aspect-[3/4] w-full rounded-[24px] object-cover object-center shadow-2xl shadow-black/40 transition duration-700"
-                priority
-              />
-            ) : (
-              <div className="relative z-[1] flex aspect-[3/4] w-full items-center justify-center rounded-[24px] bg-secondary/50 text-sm uppercase tracking-[0.35em] text-muted-foreground">
-                {siteName}
-              </div>
-            )}
+        <div className="flex flex-1 items-end justify-center md:order-2 md:justify-end">
+          <div className="relative w-full max-w-md md:max-w-lg lg:max-w-xl">
+            <div
+              className="absolute inset-0 -z-10 rounded-full bg-primary/20 blur-[140px] opacity-50"
+              aria-hidden
+            />
+            <div className="relative w-full overflow-hidden rounded-3xl md:rounded-[2.5rem] min-h-screen md:min-h-0 md:h-full md:aspect-[3/4]">
+              {safeSlides.map((slide, index) => {
+                const isActive = index === activeIndex;
+                const subtitle = slide.subtitle ?? slideSubtitle;
+                const description = slide.description ?? activeSlide.description;
+                const descriptionContent = description
+                  ? renderEmphasis(description, `mobile-description-${slide.id}`)
+                  : null;
+                return (
+                  <div
+                    key={slide.id}
+                    className={cn(
+                      "absolute inset-0 transition-opacity duration-1000 ease-out",
+                      isActive ? "opacity-100" : "pointer-events-none opacity-0",
+                    )}
+                    aria-hidden={!isActive}
+                  >
+                    {slide.imageUrl ? (
+                      <Image
+                        src={slide.imageUrl}
+                        alt={slide.title || siteName}
+                        fill
+                        priority={isActive}
+                        sizes="100vw"
+                        className="h-full w-full object-contain md:object-cover"
+                        style={{ objectPosition: "top center" }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-3xl bg-secondary/40 text-sm uppercase tracking-[0.35em] text-muted-foreground">
+                        {siteName}
+                      </div>
+                    )}
+                    <div className="absolute inset-x-0 bottom-16 flex justify-center px-2 md:hidden">
+                      <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-background/70 px-5 py-5 text-white shadow-lg backdrop-blur-xl">
+                        <div className="flex flex-col gap-4">
+                          <div className="space-y-3">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.35em] text-primary/90">
+                              {subtitle}
+                            </span>
+                            <h2 className="font-display text-3xl leading-tight sm:text-4xl">
+                              {renderEmphasis(slide.title, `mobile-title-${slide.id}`)}
+                            </h2>
+                          </div>
+                          {descriptionContent ? (
+                            <p className="text-sm text-white/80">{descriptionContent}</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

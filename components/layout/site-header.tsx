@@ -1,16 +1,36 @@
 import Link from "next/link";
-import { Menu, Search } from "lucide-react";
-import { Suspense } from "react";
+import { Facebook, Instagram, Menu, Search, Twitter, Youtube } from "lucide-react";
+import { Suspense, type ComponentType } from "react";
 
 import { getSiteConfig } from "@/lib/site-config/server";
 import { getMenuTree } from "@/lib/menu/server";
 import { resolveMenuHref } from "@/lib/menu/utils";
-import { PublicAuthActions } from "@/app/(public)/(components)/auth-actions";
 import { MobileNavigation } from "./site-header-mobile";
 import { ResponsiveLogoImage } from "./site-logo";
 
 export async function SiteHeader() {
   const [config, mainMenu] = await Promise.all([getSiteConfig(), getMenuTree("main")]);
+
+  const socialLinks = [
+    config.links.facebook
+      ? { key: "facebook", href: config.links.facebook, label: "Facebook", icon: Facebook }
+      : null,
+    config.links.instagram
+      ? { key: "instagram", href: config.links.instagram, label: "Instagram", icon: Instagram }
+      : null,
+    config.links.twitter
+      ? { key: "twitter", href: config.links.twitter, label: "Twitter", icon: Twitter }
+      : null,
+    config.links.youtube
+      ? { key: "youtube", href: config.links.youtube, label: "YouTube", icon: Youtube }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: string;
+    href: string;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+  }>;
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/40 bg-background/75 backdrop-blur-xl">
       <div className="mx-auto flex h-20 w-full max-w-6xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
@@ -38,7 +58,7 @@ export async function SiteHeader() {
           ) : null}
         </Link>
         <nav
-          className="hidden items-center gap-3 text-xs font-semibold uppercase tracking-[0.35em] md:flex"
+          className="hidden items-center gap-3 text-xs font-semibold uppercase tracking-[0.1em] md:flex"
           aria-label="Navigasi utama"
         >
           {mainMenu.map((item) => {
@@ -107,7 +127,22 @@ export async function SiteHeader() {
             <Search className="h-4 w-4" />
             <span>Cari</span>
           </Link>
-          <PublicAuthActions />
+          {socialLinks.length > 0 ? (
+            <div className="flex items-center gap-2">
+              {socialLinks.map(({ key, href, label, icon: Icon }) => (
+                <a
+                  key={key}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition hover:border-primary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  aria-label={label}
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div className="flex items-center gap-2 md:hidden">
           <button

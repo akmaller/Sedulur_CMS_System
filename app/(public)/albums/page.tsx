@@ -37,7 +37,7 @@ export default async function AlbumsPage() {
   });
 
   return (
-    <section className="space-y-8">
+    <section className="space-y-8 px-4 sm:px-6 lg:px-8">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Album Dokumentasi</h1>
         <p className="text-muted-foreground">
