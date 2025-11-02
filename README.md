@@ -4,11 +4,13 @@ Sedulur Personal Blog CMS adalah evolusi dari platform RoemahCita yang difokuska
 
 ## Fitur Utama
 - **Manajemen konten inti**: kelola artikel dan halaman statis dengan editor rich text yang familiar.
-- **Media library**: unggah dan gunakan aset gambar dari penyimpanan lokal maupun S3 kompatibel.
-- **Hero slider personal**: atur teks, tombol, dan gambar slider beranda langsung dari dashboard.
+- **Galeri & album**: dokumentasikan kegiatan dalam album foto lengkap dengan pengaturan urutan dan caption.
+- **Import WordPress**: tarik artikel dari WordPress self-hosted ataupun wordpress.com langsung ke CMS.
+- **Media library**: unggah dan gunakan aset gambar dari penyimpanan lokal maupun Cloudflare R2.
+- **Hero slider personal**: atur teks dan gambar slider beranda langsung dari dashboard.
 - **Tampilan blog modern**: beranda baru dengan skema warna gelap, tipografi personal, dan fokus pada hero.
 - **Keamanan dasar**: autentikasi credential dengan dukungan 2FA, rate limiting, serta pemblokiran IP.
-- **Ringkasan dashboard**: pantau jumlah artikel terbit, draft, hero slide aktif, dan kunjungan unik bulanan.
+- **Ringkasan dashboard**: pantau jumlah artikel terbit, draft, hero slide aktif, kunjungan unik, dan progres impor.
 
 ## Teknologi yang Digunakan
 - [Next.js 15 (App Router)](https://nextjs.org/)
@@ -53,9 +55,8 @@ Salin `.env.example` menjadi `.env.local` (untuk pengembangan) atau `.env.produc
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | (Opsional) Site key Cloudflare Turnstile untuk formulir publik (reset password). |
 | `TURNSTILE_SECRET_KEY` | (Opsional) Secret key Turnstile untuk memverifikasi token di server. Wajib saat site key diaktifkan. |
 | `CSP_ALLOW_UNSAFE_EVAL` | (Opsional) Set `true`/`1`/`yes` hanya jika benar-benar perlu mengizinkan `unsafe-eval` pada CSP. Default mengikuti mode development saja. |
-| `AWS_S3_BUCKET` | (Opsional) Nama bucket untuk media. Kosongkan untuk penyimpanan lokal. |
-| `AWS_S3_REGION` | (Opsional) Region bucket. |
-| `AWS_S3_ACCESS_KEY_ID` & `AWS_S3_SECRET_ACCESS_KEY` | (Opsional) Kredensial akses S3. |
+| `STORAGE_DRIVER` | Pilih `local` (default) atau `r2` untuk Cloudflare R2. |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PUBLIC_BASE_URL` | Konfigurasi Cloudflare R2 ketika `STORAGE_DRIVER="r2"`. |
 | `SMTP_HOST` | Host SMTP untuk pengiriman email aktivasi. |
 | `SMTP_PORT` | Port SMTP (umumnya 465 atau 587). |
 | `SMTP_USER` & `SMTP_PASSWORD` | Kredensial autentikasi SMTP. |
@@ -70,8 +71,8 @@ Salin `.env.example` menjadi `.env.local` (untuk pengembangan) atau `.env.produc
 ## Menjalankan Secara Lokal
 ```bash
 # Clone repository
-git clone <repo-url> roemahcita-cms
-cd roemahcita_cms/cms
+git clone <repo-url> sedulur-cms
+cd sedulur-cms
 cp .env.example .env.local
 # Edit .env.local sesuai konfigurasi Anda
 
@@ -100,7 +101,7 @@ Aplikasi akan tersedia di [http://localhost:3000](http://localhost:3000). Login 
 - `npm run prisma:seed` – mengisi data awal.
 
 ## Checklist Kesiapan Produksi
-- Pastikan `.env.production` terisi lengkap (database, `NEXTAUTH_SECRET`, URL publik, SMTP, opsi S3 bila diperlukan).
+- Pastikan `.env.production` terisi lengkap (database, `NEXTAUTH_SECRET`, URL publik, SMTP, konfigurasi R2 bila diperlukan).
 - Sesuaikan `DATABASE_CONNECTION_LIMIT` dengan kapasitas pool database atau layanan pgBouncer yang digunakan.
 - Jalankan `npm run lint`, `npm run test`, dan `npm run build` hingga semuanya lulus tanpa error.
 - Jalankan `npx prisma migrate deploy` pada database produksi sebelum boot pertama.
@@ -117,7 +118,7 @@ sudo apt update && sudo apt upgrade -y
 # Instal dependensi dasar
 sudo apt install -y build-essential curl git
 
-# Instal Node.js 20 via nvm
+# Instal Node.js 20 via nvm (jalankan ulang shell setelah install)
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 source ~/.nvm/nvm.sh
 nvm install 20
@@ -125,7 +126,7 @@ nvm install 20
 # (Opsional) Instal PostgreSQL lokal
 sudo apt install -y postgresql postgresql-contrib
 sudo -u postgres createuser cms_user -P
-sudo -u postgres createdb roemahcita_cms -O cms_user
+sudo -u postgres createdb sedulur_cms -O cms_user
 ```
 
 Atur firewall dan hostname sesuai kebijakan Anda (contoh menggunakan UFW dan menutup port yang tidak perlu).
@@ -133,9 +134,9 @@ Atur firewall dan hostname sesuai kebijakan Anda (contoh menggunakan UFW dan men
 ### 2. Clone Proyek & Instal Dependensi
 ```bash
 cd /var/www
-sudo mkdir roemahcita-cms && sudo chown $USER:$USER roemahcita-cms
-git clone <repo-url> roemahcita-cms
-cd roemahcita-cms/cms
+sudo mkdir sedulur-cms && sudo chown $USER:$USER sedulur-cms
+git clone <repo-url> sedulur-cms
+cd sedulur-cms
 npm ci
 ```
 
@@ -146,7 +147,7 @@ cp .env.example .env.production
 ```
 Perbarui nilainya:
 ```env
-DATABASE_URL="postgresql://cms_user:password@localhost:5432/roemahcita_cms?schema=public"
+DATABASE_URL="postgresql://cms_user:password@localhost:5432/sedulur_cms?schema=public"
 DATABASE_CONNECTION_LIMIT=10           # Sesuaikan dengan kapasitas pool DB/pgBouncer
 NEXTAUTH_URL="https://cms.domain.com"
 NEXT_PUBLIC_APP_URL="https://cms.domain.com"
@@ -184,7 +185,7 @@ NODE_ENV=production npm run start
 Agar service tetap hidup setelah logout, gunakan process manager. Contoh dengan `pm2`:
 ```bash
 sudo npm install -g pm2
-pm2 start npm --name "roemahcita-cms" -- start
+pm2 start npm --name "sedulur-cms" -- start
 pm2 save
 pm2 startup systemd
 ```
@@ -199,25 +200,25 @@ After=network.target
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/roemahcita-cms/cms
-EnvironmentFile=/var/www/roemahcita-cms/cms/.env.production
+WorkingDirectory=/var/www/sedulur-cms
+EnvironmentFile=/var/www/sedulur-cms/.env.production
 ExecStart=/usr/bin/env NODE_ENV=production /home/<user>/.nvm/versions/node/v20.11.0/bin/npm run start
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
-Simpan sebagai `/etc/systemd/system/roemahcita.service`, lalu:
+Simpan sebagai `/etc/systemd/system/sedulur.service`, lalu:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now roemahcita.service
+sudo systemctl enable --now sedulur.service
 ```
 
 ### 6. Konfigurasi Reverse Proxy & HTTPS
 Pasang Nginx dan arahkan ke port 3000:
 ```bash
 sudo apt install -y nginx
-sudo nano /etc/nginx/sites-available/roemahcita
+sudo nano /etc/nginx/sites-available/sedulur
 ```
 Contoh server block:
 ```
@@ -237,7 +238,7 @@ server {
 ```
 Aktifkan dan restart:
 ```bash
-sudo ln -s /etc/nginx/sites-available/roemahcita /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/sedulur /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -249,7 +250,7 @@ sudo certbot --nginx -d cms.domain.com
 ```
 
 ### 7. Pemeliharaan
-- Jalankan `pm2 restart roemahcita-cms` atau `systemctl restart roemahcita.service` setelah update.
+- Jalankan `pm2 restart sedulur-cms` atau `systemctl restart sedulur.service` setelah update.
 - Catat backup database secara berkala (`pg_dump` atau managed backup).
 - Gunakan halaman dashboard > Keamanan untuk memantau blokir IP dan mengubah kebijakan rate limit.
 
@@ -264,4 +265,4 @@ Jalankan lint dan test sebelum deploy untuk memastikan tidak ada regresi.
 Pull request dan diskusi issue sangat diterima. Silakan gunakan format commit yang jelas dan sertakan langkah reproduksi jika melaporkan bug.
 
 ---
-© RoemahCita CMS – dibangun dengan penuh perhatian pada keamanan dan pengalaman editorial.
+© Sedulur Personal Blog CMS – dibangun dengan penuh perhatian pada keamanan dan pengalaman editorial.
