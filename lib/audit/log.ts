@@ -69,6 +69,40 @@ function getQueue(): PendingLog[] {
   return globalScope.__auditLogQueue;
 }
 
+function mapPendingLogToCreateData(item: PendingLog) {
+  return {
+    action: item.action,
+    entity: item.entity,
+    entityId: item.entityId,
+    userId: item.userId ?? undefined,
+    metadata: item.metadata ?? Prisma.JsonNull,
+    createdAt: item.createdAt,
+  };
+}
+
+async function persistSingleLog(item: PendingLog) {
+  try {
+    await prisma.auditLog.create({
+      data: mapPendingLogToCreateData(item),
+    });
+  } catch (error) {
+    if (
+      item.userId &&
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2003"
+    ) {
+      await prisma.auditLog.create({
+        data: {
+          ...mapPendingLogToCreateData(item),
+          userId: undefined,
+        },
+      });
+      return;
+    }
+    throw error;
+  }
+}
+
 async function flushQueue() {
   const queue = getQueue();
   if (queue.length === 0) {
@@ -79,18 +113,17 @@ async function flushQueue() {
 
   try {
     await prisma.auditLog.createMany({
-      data: batch.map((item) => ({
-        action: item.action,
-        entity: item.entity,
-        entityId: item.entityId,
-        userId: item.userId,
-        metadata: item.metadata ?? Prisma.JsonNull,
-        createdAt: item.createdAt,
-      })),
+      data: batch.map((item) => mapPendingLogToCreateData(item)),
     });
   } catch (error) {
     console.error("Failed to persist audit log batch", error);
-    queue.unshift(...batch);
+    for (const item of batch) {
+      try {
+        await persistSingleLog(item);
+      } catch (singleError) {
+        console.error("Failed to persist single audit log entry", singleError, item);
+      }
+    }
   }
 
   if (queue.length > 0) {
