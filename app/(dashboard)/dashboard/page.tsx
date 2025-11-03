@@ -150,7 +150,7 @@ export default async function DashboardHomePage() {
                           {isPublished ? "Terbit" : "Draft"}
                         </Badge>
                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/dashboard/articles/${article.id}`}>Kelola</Link>
+                          <Link href={`/dashboard/articles/${article.id}/edit`}>Kelola</Link>
                         </Button>
                       </div>
                     </div>

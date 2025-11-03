@@ -482,6 +482,16 @@ const userFormSchema = z.object({
   role: z.enum(["ADMIN", "EDITOR", "AUTHOR"]),
 });
 
+const userUpdateSchema = z.object({
+  id: z.string().cuid(),
+  name: z.string().min(2, "Nama minimal 2 karakter"),
+  email: z.string().email("Email tidak valid"),
+  password: z.string().min(8, "Password minimal 8 karakter").optional(),
+  role: z.enum(["ADMIN", "EDITOR", "AUTHOR"]),
+  emailVerified: z.boolean(),
+  canPublish: z.boolean(),
+});
+
 export async function createUser(formData: FormData) {
   try {
     await assertRole("ADMIN");
@@ -523,6 +533,125 @@ export async function createUser(formData: FormData) {
   } catch (error) {
     console.error(error);
     return { error: "Gagal membuat pengguna" };
+  }
+}
+
+export async function updateUser(formData: FormData) {
+  try {
+    const session = await assertRole("ADMIN");
+
+    const passwordRaw = formData.get("password");
+    const password =
+      typeof passwordRaw === "string" && passwordRaw.trim().length > 0 ? passwordRaw : undefined;
+
+    const parsed = userUpdateSchema.safeParse({
+      id: formData.get("id"),
+      name: formData.get("name"),
+      email: formData.get("email"),
+      password,
+      role: formData.get("role"),
+      emailVerified: formData.get("emailVerified") === "on",
+      canPublish: formData.get("canPublish") === "on",
+    });
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? "Data pengguna tidak valid" };
+    }
+
+    if (parsed.data.id === session.user.id && parsed.data.role !== "ADMIN") {
+      return { error: "Tidak dapat mengubah peran akun Anda sendiri." };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: parsed.data.id },
+      select: { id: true, email: true, emailVerified: true },
+    });
+
+    if (!user) {
+      return { error: "Pengguna tidak ditemukan" };
+    }
+
+    if (parsed.data.email !== user.email) {
+      const existingEmail = await prisma.user.findUnique({
+        where: { email: parsed.data.email },
+        select: { id: true },
+      });
+      if (existingEmail && existingEmail.id !== parsed.data.id) {
+        return { error: "Email sudah digunakan oleh pengguna lain" };
+      }
+    }
+
+    const updateData: Prisma.UserUpdateInput = {
+      name: parsed.data.name,
+      email: parsed.data.email,
+      role: parsed.data.role,
+      canPublish: parsed.data.canPublish,
+    };
+
+    if (parsed.data.password) {
+      updateData.passwordHash = await hashPassword(parsed.data.password);
+    }
+
+    updateData.emailVerified = parsed.data.emailVerified
+      ? user.emailVerified ?? new Date()
+      : null;
+
+    await prisma.user.update({
+      where: { id: parsed.data.id },
+      data: updateData,
+    });
+
+    await writeAuditLog({
+      action: "USER_UPDATE",
+      entity: "User",
+      entityId: parsed.data.id,
+      metadata: {
+        email: parsed.data.email,
+        role: parsed.data.role,
+        emailVerified: parsed.data.emailVerified,
+        canPublish: parsed.data.canPublish,
+      },
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "Gagal memperbarui pengguna" };
+  }
+}
+
+export async function deleteUserAction(userId: string) {
+  try {
+    const session = await assertRole("ADMIN");
+
+    if (userId === session.user.id) {
+      return { error: "Tidak dapat menghapus akun Anda sendiri." };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      return { error: "Pengguna tidak ditemukan" };
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    await writeAuditLog({
+      action: "USER_DELETE",
+      entity: "User",
+      entityId: userId,
+      metadata: { email: user.email, role: user.role },
+    });
+
+    revalidatePath("/dashboard/users");
+    return { success: true };
+  } catch (error) {
+    console.error(error);
+    return { error: "Gagal menghapus pengguna" };
   }
 }
 

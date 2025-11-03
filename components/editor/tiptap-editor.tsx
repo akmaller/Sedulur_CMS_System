@@ -60,7 +60,7 @@ export function TiptapEditor({ value, onChange, placeholder, mediaItems = [] }: 
     editorProps: {
       attributes: {
         class:
-          "min-h-[240px] prose prose-neutral max-w-none dark:prose-invert focus:outline-none",
+          "min-h-[240px] prose prose-neutral max-w-none text-foreground dark:prose-invert focus:outline-none",
       },
     },
     onUpdate({ editor }) {

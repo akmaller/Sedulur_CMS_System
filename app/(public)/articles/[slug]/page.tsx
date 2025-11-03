@@ -145,12 +145,12 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     formatRelativeTime(article.publishedAt ?? article.createdAt) || "-";
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
         <article className="flex flex-col gap-10 text-white">
           <header className="space-y-4">
             <div className="space-y-2">
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{article.title}</h1>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl sm:px-0">{article.title}</h1>
               <div className="flex flex-wrap items-center gap-2 text-sm text-white/80">
                 {categories.length ? (
                   <>
