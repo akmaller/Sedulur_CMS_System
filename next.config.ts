@@ -12,6 +12,17 @@ const imagesRemotePatterns = (() => {
     process.env.R2_PUBLIC_BASE_URL,
   ];
 
+  if (
+    (!process.env.R2_PUBLIC_BASE_URL || process.env.R2_PUBLIC_BASE_URL.trim().length === 0) &&
+    (process.env.STORAGE_DRIVER ?? "").toLowerCase() === "r2"
+  ) {
+    const accountId = process.env.R2_ACCOUNT_ID;
+    const bucket = process.env.R2_BUCKET;
+    if (accountId && bucket) {
+      candidates.push(`https://pub-${accountId}.r2.dev/${bucket}`);
+    }
+  }
+
   const patterns: RemotePattern[] = [];
   const seen = new Set<string>();
 

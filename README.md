@@ -56,7 +56,7 @@ Salin `.env.example` menjadi `.env.local` (untuk pengembangan) atau `.env.produc
 | `TURNSTILE_SECRET_KEY` | (Opsional) Secret key Turnstile untuk memverifikasi token di server. Wajib saat site key diaktifkan. |
 | `CSP_ALLOW_UNSAFE_EVAL` | (Opsional) Set `true`/`1`/`yes` hanya jika benar-benar perlu mengizinkan `unsafe-eval` pada CSP. Default mengikuti mode development saja. |
 | `STORAGE_DRIVER` | Pilih `local` (default) atau `r2` untuk Cloudflare R2. |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PUBLIC_BASE_URL` | Konfigurasi Cloudflare R2 ketika `STORAGE_DRIVER="r2"`. |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_PUBLIC_BASE_URL` | Konfigurasi Cloudflare R2 ketika `STORAGE_DRIVER="r2"`. `R2_PUBLIC_BASE_URL` harus mengarah ke domain publik (contoh: `https://pub-<ACCOUNT_ID>.r2.dev/<bucket>` atau domain CDN Anda). |
 | `SMTP_HOST` | Host SMTP untuk pengiriman email aktivasi. |
 | `SMTP_PORT` | Port SMTP (umumnya 465 atau 587). |
 | `SMTP_USER` & `SMTP_PASSWORD` | Kredensial autentikasi SMTP. |

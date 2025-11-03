@@ -1097,12 +1097,22 @@ export async function updateArticle(formData: FormData) {
       }
     }
 
+    const rawFeaturedMediaId = formData.get("featuredMediaId");
+    const normalizedFeaturedMediaId =
+      rawFeaturedMediaId === "__REMOVE__"
+        ? null
+        : typeof rawFeaturedMediaId === "string" && rawFeaturedMediaId.trim().length > 0
+          ? rawFeaturedMediaId
+          : rawFeaturedMediaId === null
+            ? null
+            : null;
+
     const parsed = articleUpdateFormSchema.safeParse({
       articleId: formData.get("articleId"),
       title: formData.get("title"),
       slug: formData.get("slug") || undefined,
       content: formData.get("content") || JSON.stringify(EMPTY_TIPTAP_DOC),
-      featuredMediaId: (formData.get("featuredMediaId") || null) as string | null,
+      featuredMediaId: normalizedFeaturedMediaId,
     });
 
     if (!parsed.success) {

@@ -112,9 +112,14 @@ function ensureR2Config(): R2Config {
     );
   }
 
-  const baseUrlRaw =
-    process.env.R2_PUBLIC_BASE_URL?.trim() ??
-    `${sanitizeBaseUrl(endpoint)}/${bucket}`;
+  let baseUrlRaw = process.env.R2_PUBLIC_BASE_URL?.trim();
+  if (!baseUrlRaw) {
+    if (accountId) {
+      baseUrlRaw = `https://pub-${accountId}.r2.dev/${bucket}`;
+    } else {
+      baseUrlRaw = `${sanitizeBaseUrl(endpoint)}/${bucket}`;
+    }
+  }
 
   return {
     bucket,
