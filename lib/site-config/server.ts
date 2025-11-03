@@ -17,13 +17,13 @@ const mergeConfig = (values?: ConfigValues | null): ResolvedSiteConfig => {
   const metadata = values?.metadata ?? {};
   const social = values?.social ?? {};
 
-  const resolveSocialLink = (key: keyof typeof defaultSiteConfig.links): string | null => {
+  const resolveSocialLink = (key: keyof typeof defaultSiteConfig.links): string | undefined => {
     const hasCustomValue = social && Object.prototype.hasOwnProperty.call(social, key);
     if (hasCustomValue) {
       const raw = (social as Record<string, unknown>)[key];
-      return trimOrNull(raw);
+      return trimOrNull(raw) ?? undefined;
     }
-    return trimOrNull(defaultSiteConfig.links[key]);
+    return trimOrNull(defaultSiteConfig.links[key]) ?? undefined;
   };
 
   const registrationDefaults = defaultSiteConfig.registration ?? { enabled: true, autoApprove: false };

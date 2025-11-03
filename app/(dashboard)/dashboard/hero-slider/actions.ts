@@ -28,10 +28,14 @@ const heroSlideFormSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+type HeroSlideFormValues = z.infer<typeof heroSlideFormSchema>;
+type HeroSlideFieldKey = keyof HeroSlideFormValues;
+type HeroSlideFieldErrors = Partial<Record<HeroSlideFieldKey, string>>;
+
 export type HeroSlideFormState = {
   success?: boolean;
   error?: string;
-  fieldErrors?: Partial<Record<keyof z.infer<typeof heroSlideFormSchema>, string>>;
+  fieldErrors?: HeroSlideFieldErrors;
 };
 
 function parseHeroSlideForm(formData: FormData) {
@@ -58,13 +62,17 @@ function parseHeroSlideForm(formData: FormData) {
   });
 }
 
-function toFieldErrors(error: z.ZodError): HeroSlideFormState["fieldErrors"] {
-  const fieldErrors: HeroSlideFormState["fieldErrors"] = {};
+function isHeroSlideFieldKey(value: string): value is HeroSlideFieldKey {
+  return Object.prototype.hasOwnProperty.call(heroSlideFormSchema.shape, value);
+}
+
+function toFieldErrors(error: z.ZodError): HeroSlideFieldErrors {
+  const fieldErrors: HeroSlideFieldErrors = {};
   for (const issue of error.issues) {
     if (issue.path.length > 0) {
       const key = issue.path[0];
-      if (typeof key === "string" && !fieldErrors?.[key as keyof HeroSlideFormState["fieldErrors"]]) {
-        fieldErrors![key as keyof HeroSlideFormState["fieldErrors"]] = issue.message;
+      if (typeof key === "string" && isHeroSlideFieldKey(key) && !fieldErrors[key]) {
+        fieldErrors[key] = issue.message;
       }
     }
   }

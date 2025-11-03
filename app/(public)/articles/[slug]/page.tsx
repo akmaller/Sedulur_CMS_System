@@ -30,17 +30,27 @@ async function getArticle(slug: string) {
 }
 
 export async function generateStaticParams() {
-  const articles = await prisma.article.findMany({
-    where: { status: ArticleStatus.PUBLISHED },
-    select: { slug: true },
-  });
+  try {
+    const articles = await prisma.article.findMany({
+      where: { status: ArticleStatus.PUBLISHED },
+      select: { slug: true },
+    });
 
-  return articles.map((article) => ({ slug: article.slug }));
+    return articles.map((article) => ({ slug: article.slug }));
+  } catch (error) {
+    console.error("generateStaticParams (articles/[slug])", error);
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const article = await getArticle(slug);
+  let article: Awaited<ReturnType<typeof getArticle>> | null = null;
+  try {
+    article = await getArticle(slug);
+  } catch (error) {
+    console.error("generateMetadata (articles/[slug])", error);
+  }
   if (!article || article.status !== ArticleStatus.PUBLISHED) {
     return createMetadata({
       title: "Artikel tidak ditemukan",
@@ -86,7 +96,12 @@ type ArticlePageProps = {
 
 export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const { slug } = await params;
-  const article = await getArticle(slug);
+  let article: Awaited<ReturnType<typeof getArticle>> | null = null;
+  try {
+    article = await getArticle(slug);
+  } catch (error) {
+    console.error("ArticleDetailPage prisma fetch failed", error);
+  }
   if (!article || article.status !== ArticleStatus.PUBLISHED) {
     notFound();
   }

@@ -15,17 +15,19 @@ import { serializePublicArticle, publicArticleInclude } from "@/lib/articles/pub
 import { HeroSlider, type HeroSlideItem } from "./(components)/hero-slider";
 import { LatestArticlesGrid } from "./(components)/latest-articles-grid";
 
+const heroSlideInclude = {
+  image: {
+    select: {
+      url: true,
+      title: true,
+      width: true,
+      height: true,
+    },
+  },
+} satisfies Prisma.HeroSlideInclude;
+
 type HeroSlideWithImage = Prisma.HeroSlideGetPayload<{
-  include: {
-    image: {
-      select: {
-        url: true;
-        title: true;
-        width: true | null;
-        height: true | null;
-      };
-    };
-  };
+  include: typeof heroSlideInclude;
 }>;
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -90,16 +92,7 @@ export default async function HomePage() {
     prisma.heroSlide.findMany({
       where: { isActive: true },
       orderBy: { order: "asc" },
-      include: {
-        image: {
-          select: {
-            url: true,
-            title: true,
-            width: true,
-            height: true,
-          },
-        },
-      },
+      include: heroSlideInclude,
     }),
     prisma.article.findMany({
       where: { status: ArticleStatus.PUBLISHED },
