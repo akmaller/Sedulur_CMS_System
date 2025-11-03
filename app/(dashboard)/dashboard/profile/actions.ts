@@ -1,6 +1,6 @@
 "use server";
 
-import { mkdir, stat, unlink, writeFile } from "fs/promises";
+import { stat, unlink } from "fs/promises";
 import path from "path";
 import sharp from "sharp";
 import { revalidatePath } from "next/cache";
@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAuditLog } from "@/lib/audit/log";
 import { AUTHOR_SOCIAL_FIELDS, AUTHOR_SOCIAL_KEYS, type AuthorSocialKey } from "@/lib/authors/social-links";
 import { findForbiddenPhraseInInputs } from "@/lib/moderation/forbidden-terms";
+import { saveMediaFile, deleteMediaFile } from "@/lib/storage/media";
 
 const profileUpdateSchema = z.object({
   name: z
@@ -218,7 +219,77 @@ export async function changePassword(formData: FormData) {
 
 const AVATAR_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const AVATAR_MAX_SIZE = 3 * 1024 * 1024; // 3MB
-const AVATAR_UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "avatars");
+
+function sanitizeBaseUrlCandidate(raw?: string | null) {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const withProtocol = /^[a-z]+:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withProtocol);
+    url.pathname = url.pathname.replace(/\/+$/, "");
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+function getR2BaseUrls(): URL[] {
+  const bases: URL[] = [];
+  const explicit = sanitizeBaseUrlCandidate(process.env.R2_PUBLIC_BASE_URL);
+  if (explicit) bases.push(explicit);
+
+  const accountId = process.env.R2_ACCOUNT_ID?.trim();
+  const bucket = process.env.R2_BUCKET?.trim();
+  const endpoint = process.env.R2_ENDPOINT?.trim();
+
+  if (accountId && bucket) {
+    const fallback = sanitizeBaseUrlCandidate(`https://pub-${accountId}.r2.dev/${bucket}`);
+    if (fallback) bases.push(fallback);
+  }
+
+  if (endpoint && bucket) {
+    const endpointUrl = sanitizeBaseUrlCandidate(`${endpoint.replace(/\/+$/, "")}/${bucket}`);
+    if (endpointUrl) bases.push(endpointUrl);
+  }
+
+  return bases;
+}
+
+type StoredAvatarInfo = {
+  storageType: "local" | "r2";
+  fileName: string;
+};
+
+function resolveStoredAvatarInfo(url: string | null | undefined): StoredAvatarInfo | null {
+  if (!url) return null;
+  const cleanUrl = url.split("?")[0] ?? "";
+  if (!cleanUrl) return null;
+
+  if (cleanUrl.startsWith("/")) {
+    return { storageType: "local", fileName: cleanUrl.replace(/^\/+/, "") };
+  }
+
+  try {
+    const parsed = new URL(cleanUrl);
+    const candidates = getR2BaseUrls();
+    for (const base of candidates) {
+      if (parsed.hostname !== base.hostname) continue;
+      let basePath = base.pathname.replace(/\/+$/, "");
+      if (!basePath) basePath = "";
+      const parsedPath = parsed.pathname;
+      if (!parsedPath.startsWith(basePath)) continue;
+      let relative = parsedPath.slice(basePath.length);
+      relative = relative.replace(/^\/+/, "");
+      if (!relative) continue;
+      return { storageType: "r2", fileName: relative };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export async function updateAvatar(formData: FormData) {
   const session = await requireAuth();
@@ -264,38 +335,46 @@ export async function updateAvatar(formData: FormData) {
     return { success: false, message: "Gagal memproses gambar. Gunakan file lain." };
   }
 
-  const fileName = `${userId}-${Date.now()}.webp`;
-  const targetPath = path.join(AVATAR_UPLOAD_DIR, fileName);
-  const publicPath = `/uploads/avatars/${fileName}`;
+  const processedData = new Uint8Array(processed);
+  const processedFile = new File([processedData], `${userId}-${Date.now()}.webp`, {
+    type: "image/webp",
+  });
 
+  let saved;
   try {
-    await mkdir(AVATAR_UPLOAD_DIR, { recursive: true });
-    await writeFile(targetPath, processed);
+    saved = await saveMediaFile(processedFile, { directory: "uploads/avatars" });
   } catch (error) {
     console.error(error);
     return { success: false, message: "Gagal menyimpan gambar. Coba lagi nanti." };
   }
 
-  if (user.avatarUrl && user.avatarUrl.startsWith("/uploads/avatars/")) {
+  const previousInfo = resolveStoredAvatarInfo(user.avatarUrl);
+  if (previousInfo) {
+    try {
+      await deleteMediaFile(previousInfo.storageType, previousInfo.fileName);
+    } catch (error) {
+      console.error("Gagal menghapus avatar lama", error);
+    }
+  } else if (user.avatarUrl && user.avatarUrl.startsWith("/uploads/avatars/")) {
     const oldPath = path.join(process.cwd(), "public", user.avatarUrl);
     try {
       await stat(oldPath);
       await unlink(oldPath);
     } catch {
-      // File lama sudah tidak ada, abaikan.
+      // Ignore missing legacy files.
     }
   }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { avatarUrl: publicPath },
+    data: { avatarUrl: saved.url },
   });
 
   await writeAuditLog({
     action: "USER_UPDATE",
     entity: "User",
     entityId: userId,
-    metadata: { scope: "avatar", path: publicPath },
+    metadata: { scope: "avatar", path: saved.fileName, storage: saved.storageType },
   });
 
   revalidatePath("/dashboard/profile");
@@ -304,6 +383,6 @@ export async function updateAvatar(formData: FormData) {
   return {
     success: true,
     message: "Foto profil berhasil diperbarui.",
-    url: `${publicPath}?v=${Date.now()}`,
+    url: `${saved.url}?v=${Date.now()}`,
   };
 }
